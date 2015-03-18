@@ -1,34 +1,64 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 
 namespace DawgSharp
 {
     class LevelBuilder <TPayload>
     {
-        private readonly List <List <NodeWrapper <TPayload>>> levels = new List <List <NodeWrapper <TPayload>>> ();
-
-        public List <List <NodeWrapper <TPayload>>> Levels
+        public static List <List <NodeWrapper <TPayload>>> BuildLevels (Node <TPayload> root)
         {
-            get { return levels; }
-        }
+            var levels = new List <List <NodeWrapper <TPayload>>> ();
 
-        public int GetLevel (Node <TPayload> node, Node<TPayload> super, char @char)
-        {
-            var level = node.HasChildren () ? node.Children.Max (child => GetLevel (child.Value, node, child.Key)) + 1 : 0;
+            var stack = new Stack <StackNode <TPayload>> ();
 
-            if (super != null)
+            Push (stack, root);
+
+            while (stack.Count > 0)
             {
-                if (Levels.Count <= level)
+                if (stack.Peek ().ChildIterator.MoveNext ())
                 {
-                    Levels.Add (new List <NodeWrapper <TPayload>> ());
+                    // go deeper
+                    Push (stack, stack.Peek ().ChildIterator.Current.Value);
                 }
+                else
+                {
+                    var current = stack.Pop ();
 
-                var list = Levels [level];
+                    if (stack.Count > 0)
+                    {
+                        int level = current.Level;
 
-                list.Add (new NodeWrapper <TPayload> (node, super, @char));
+                        if (levels.Count <= level)
+                        {
+                            levels.Add (new List <NodeWrapper <TPayload>> ());
+                        }
+
+                        var list = levels [level];
+
+                        list.Add (new NodeWrapper <TPayload> (current.Node, stack.Peek ().Node, stack.Peek ().ChildIterator.Current.Key));
+
+                        int superLevel = current.Level + 1;
+
+                        if (stack.Peek ().Level < superLevel)
+                        {
+                            stack.Peek ().Level = superLevel;
+                        }
+                    }
+                }
             }
 
-            return level;
+            return levels;
         }
+
+        private static void Push (Stack <StackNode <TPayload>> stack, Node <TPayload> node)
+        {
+            stack.Push (new StackNode <TPayload> {Node = node, ChildIterator = node.Children.GetEnumerator ()});
+        }
+    }
+
+    class StackNode <TPayload>
+    {
+        public Node <TPayload> Node;
+        public IEnumerator <KeyValuePair <char, Node <TPayload>>> ChildIterator;
+        public int Level;
     }
 }
